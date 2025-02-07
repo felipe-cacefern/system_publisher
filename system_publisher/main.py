@@ -17,7 +17,7 @@ from std_msgs.msg import String
 def remainingStorage():
     path = "/"
     total, used, free = shutil.disk_usage(path) 
-    return free / (1024 ** 3)
+    return free
 
 def cpuUsage():
     cpuCount = os.cpu_count()
@@ -26,18 +26,18 @@ def cpuUsage():
 
 def ramUsage():
     memory = psutil.virtual_memory()
-    return memory.used / (1024 ** 3)
+    return memory.used
 
 def ramCapacity():
     memory = psutil.virtual_memory()
-    return memory.available / (1024 ** 3)
+    return memory.available
 
 def swapUsage():
     total, used, free, percent, sin, sout = psutil.swap_memory()
     # import ipdb; ipdb.set_trace()
     print('THE USED VALUE:', used)
     print('TYPE:', type(used))
-    return used / (1024 ** 3)
+    return used
 
 def swapChange():
     interval = 1
@@ -54,12 +54,9 @@ def gpuUsage():
     )
     
     # Parse the output
-    gpu_utilization_mb, memory_used_mb, memory_total_mb, _ = result.stdout.strip().split(',')
+    gpu_utilization_per, memory_used_mb, memory_total_mb, _ = result.stdout.strip().split(',')
 
-    return gpu_utilization_mb, memory_used_mb, memory_total_mb
-
-
-
+    return gpu_utilization_per, memory_used_mb, memory_total_mb
 
 
 
@@ -71,8 +68,6 @@ class MyNode(Node):
         
         self.publisher_ = self.create_publisher(String, 'topic_out', 10)
         self.publisher_ = self.create_publisher(String, 'topic_out', 10)
-        
-
 
         self.subscription = self.create_subscription(
             String,
@@ -84,22 +79,58 @@ class MyNode(Node):
         # Start a timer to publish a message at regular intervals (1Hz)
         self.timer = self.create_timer(1.0, self.timer_callback)
 
+
+    def correctDecimalPoints(self, n, x):
+        decimalPoints = x
+        n = n * 10**decimalPoints
+        n //= 1
+        n = n * 10**decimalPoints
+        return n
+
+    def mb_to_gb(n):
+        return n / (1024 ** 3)
+
     def timer_callback(self):
         # Publish a message
         msg = String()
 
-        gpu_utility_mb, gpu_mem_used_mb, gpu_mem_total_mb = gpuUsage()
+        decimals = 3
+
+        remainingStorage_gb = self.mb_to_gb(remainingStorage())
+        remainingStorage_gb = self.correctDecimalPoints(remainingStorage_gb)
+
+        gpu_utility_per, gpu_mem_used_mb, gpu_mem_total_mb = gpuUsage()
+
+        gpu_mem_used_gb = self.mb_to_gb(gpu_mem_used_mb)
+        gpu_mem_used_gb = self.correctDecimalPoints(gpu_mem_used_gb, decimals)
+
+        gpu_mem_total_gb = self.mb_to_gb(gpu_mem_total_mb)
+        gpu_mem_total_gb = self.correctDecimalPoints(gpu_mem_total_gb, decimals)
+
+        cpuUsage_per = cpuUsage()
+
+        ramUsage_gb = self.mb_to_gb(ramUsage())
+        ramUsage_gb = self.correctDecimalPoints(ramUsage_gb, decimals)
+
+        ramCapacity_gb = self.mb_to_gb(ramCapacity())
+        ramCapacity_gb = self.correctDecimalPoints(ramCapacity_gb, decimals)
+
+        swapUsage_gb = self.mb_to_gb(swapUsage())
+        swapUsage_gb = self.correctDecimalPoints(swapUsage_gb, decimals)
+
+        swapChange_gb = self.mb_to_gb(swapChange())
+        swapChange_gb = self.correctDecimalPoints(swapChange_gb)
 
         msg.data = \
-            f'Remaining Storage: {remainingStorage()}\n'\
-            f'CPU Usage: {cpuUsage()}\n'\
-            f'RAM Usage: {ramUsage()}\n'\
-            f'RAM Capacity: {ramCapacity()}\n'\
-            f'Swap Usage: {swapUsage()}\n'\
-            f'Swap Change: {swapChange()}\n'\
-            f'GPU Usage: {gpu_utility_mb}MB\n'\
-            f'GPU mem used: {gpu_mem_used_mb}MB'\
-            f'GPU Capacity: {gpu_mem_total_mb}MB'
+            f'Remaining Storage: {remainingStorage_gb}GB\n'\
+            f'CPU Usage: {cpuUsage_per}%\n'\
+            f'RAM Usage: {ramUsage_gb}GB\n'\
+            f'RAM Capacity: {ramCapacity_gb}GB\n'\
+            f'Swap Usage: {swapUsage_gb}GB\n'\
+            f'Swap Change: {swapChange_gb}GB/s\n'\
+            f'GPU Usage: {gpu_utility_per}%\n'\
+            f'GPU Memory Used: {gpu_mem_used_gb}GB\n'\
+            f'GPU Memory Capacity: {gpu_mem_total_gb}GB'
 
 
         self.publisher_.publish(msg)
