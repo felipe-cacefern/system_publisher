@@ -21,7 +21,6 @@ setup(
     entry_points={
         'console_scripts': [
             'system_monitor = system_publisher.main:main',
-            'system_subscriber = system_publisher.subscriber:main',
         ],
     },
 )

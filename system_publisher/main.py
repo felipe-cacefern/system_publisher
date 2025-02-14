@@ -35,8 +35,6 @@ def ramCapacity():
 def swapUsage():
     total, used, free, percent, sin, sout = psutil.swap_memory()
     # import ipdb; ipdb.set_trace()
-    print('THE USED VALUE:', used)
-    print('TYPE:', type(used))
     return used
 
 def swapChange():
@@ -56,7 +54,7 @@ def gpuUsage():
     # Parse the output
     gpu_utilization_per, memory_used_mb, memory_total_mb, _ = result.stdout.strip().split(',')
 
-    return gpu_utilization_per, memory_used_mb, memory_total_mb
+    return int(gpu_utilization_per), int(memory_used_mb), int(memory_total_mb)
 
 
 
@@ -66,15 +64,14 @@ class MyNode(Node):
     def __init__(self):
         super().__init__('my_node')
         
-        self.publisher_ = self.create_publisher(String, 'topic_out', 10)
-        self.publisher_ = self.create_publisher(String, 'topic_out', 10)
+        self.publisher_ = self.create_publisher(String, 'system_monitor', 10)
 
-        self.subscription = self.create_subscription(
-            String,
-            'topic_in',
-            self.listener_callback,
-            10
-        )
+        # self.subscription = self.create_subscription(
+        #     String,
+        #     'topic_in',
+        #     self.listener_callback,
+        #     10
+        # )
         
         # Start a timer to publish a message at regular intervals (1Hz)
         self.timer = self.create_timer(1.0, self.timer_callback)
@@ -84,11 +81,16 @@ class MyNode(Node):
         decimalPoints = x
         n = n * 10**decimalPoints
         n //= 1
-        n = n * 10**decimalPoints
+        n = n / 10**decimalPoints
         return n
 
-    def mb_to_gb(n):
-        return n / (1024 ** 3)
+
+    def b_to_gb(self, n):
+        return n / 1000000000
+
+
+    def mb_to_gb(self, n):
+        return n / 1000
 
     def timer_callback(self):
         # Publish a message
@@ -96,10 +98,12 @@ class MyNode(Node):
 
         decimals = 3
 
-        remainingStorage_gb = self.mb_to_gb(remainingStorage())
-        remainingStorage_gb = self.correctDecimalPoints(remainingStorage_gb)
+        remainingStorage_gb = self.b_to_gb(remainingStorage())
+        remainingStorage_gb = self.correctDecimalPoints(remainingStorage_gb, decimals)
 
         gpu_utility_per, gpu_mem_used_mb, gpu_mem_total_mb = gpuUsage()
+
+        gpu_utility_per = self.correctDecimalPoints(gpu_utility_per, decimals)
 
         gpu_mem_used_gb = self.mb_to_gb(gpu_mem_used_mb)
         gpu_mem_used_gb = self.correctDecimalPoints(gpu_mem_used_gb, decimals)
@@ -108,18 +112,19 @@ class MyNode(Node):
         gpu_mem_total_gb = self.correctDecimalPoints(gpu_mem_total_gb, decimals)
 
         cpuUsage_per = cpuUsage()
+        cpuUsage_per = self.correctDecimalPoints(cpuUsage_per, decimals)
 
-        ramUsage_gb = self.mb_to_gb(ramUsage())
+        ramUsage_gb = self.b_to_gb(ramUsage())
         ramUsage_gb = self.correctDecimalPoints(ramUsage_gb, decimals)
 
-        ramCapacity_gb = self.mb_to_gb(ramCapacity())
+        ramCapacity_gb = self.b_to_gb(ramCapacity())
         ramCapacity_gb = self.correctDecimalPoints(ramCapacity_gb, decimals)
 
-        swapUsage_gb = self.mb_to_gb(swapUsage())
+        swapUsage_gb = self.b_to_gb(swapUsage())
         swapUsage_gb = self.correctDecimalPoints(swapUsage_gb, decimals)
 
-        swapChange_gb = self.mb_to_gb(swapChange())
-        swapChange_gb = self.correctDecimalPoints(swapChange_gb)
+        swapChange_gb = self.b_to_gb(swapChange())
+        swapChange_gb = self.correctDecimalPoints(swapChange_gb, decimals)
 
         msg.data = \
             f'Remaining Storage: {remainingStorage_gb}GB\n'\
@@ -134,11 +139,12 @@ class MyNode(Node):
 
 
         self.publisher_.publish(msg)
-        self.get_logger().info(f'Publishing: {msg.data}')
+        # self.get_logger().info(f'Publishing: {msg.data}')
 
     def listener_callback(self, msg):
         # Handle the message received from 'topic_in'
-        self.get_logger().info(f'Received: {msg.data}')
+        # self.get_logger().info(f'Received: {msg.data}')
+        pass
 
 
 def main(args=None):
